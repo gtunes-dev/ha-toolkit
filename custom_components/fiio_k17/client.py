@@ -131,13 +131,14 @@ class FiiOK17Client:
         if not 0 <= volume <= 100:
             raise ValueError("Volume must be between 0 and 100")
 
-        cmd = f"{CMD_SET_VOLUME_PREFIX}{volume:04x}"
-        await self._send_and_receive(cmd)
+        cmd: str | None = f"{CMD_SET_VOLUME_PREFIX}{volume:04x}"
 
         # The device may send unsolicited notifications (a60a) before the ack.
-        # Keep reading until we get the volume response or timeout.
+        # Loop: send command on first iteration, then just read on subsequent ones.
         for _ in range(5):
-            response = await self._send_and_receive(None)  # Read without sending
+            response = await self._send_and_receive(cmd)
+            cmd = None  # Don't re-send on subsequent iterations
+
             if response and response.lower().startswith(RESP_VOLUME):
                 try:
                     echoed = int(response[-4:], 16)
