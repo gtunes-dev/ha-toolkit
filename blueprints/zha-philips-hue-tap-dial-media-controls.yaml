@@ -15,8 +15,10 @@ blueprint:
     That blueprint can be found here:
     https://community.home-assistant.io/t/zha-philips-hue-tap-switch-custom-controls-rdm002/789654
 
-    To use this current blueprint, simply select the Hue Tap Dial which will generate 
-    events and the Media device to be controlled.
+    To use this current blueprint, simply select the Hue Tap Dial which will generate
+    events and the Media devices to be controlled. You can specify separate media players
+    for volume control (dial) and transport control (play/pause, track navigation), or
+    select the same player for both.
 
     ## Built-In Behaviors
 
@@ -65,6 +67,12 @@ blueprint:
         Increase likelihood that we'll be find and use the device's friendly name in logbook events.
         Normalize logbook events for consisstency.
         Thank you trevorwarwick for reporting this issue!
+    * 2.00 (Jan-29-2026) : BREAKING CHANGE - Separate volume and transport players.
+        You can now specify different media players for volume control (dial rotation)
+        and transport control (play/pause, previous/next track buttons).
+        Existing automations will need to be updated to specify both players.
+        Optionally, you can edit your automation's YAML and delete the now-unused
+        "automated_player" value.
     
   input:
     remote:
@@ -75,9 +83,17 @@ blueprint:
           manufacturer: Signify Netherlands B.V.
           model: RDM002
           multiple: false
-    automated_player:
-      name: Media Player
-      description: The media player to control with this automation
+    volume_player:
+      name: Volume Player
+      description: The media player for volume control (dial rotation)
+      selector:
+        entity:
+          domain:
+          - media_player
+          multiple: false
+    transport_player:
+      name: Transport Player
+      description: The media player for play/pause and track controls (buttons)
       selector:
         entity:
           domain:
@@ -96,8 +112,8 @@ blueprint:
         volume_only_when_playing:
           name: Adjust Volume Only When Playing
           description: If enabled, rotating the dial will only adjust the volume if
-            the media player is currently playing. If the media player is stopped or
-            paused, the event will be ignored
+            the Transport Player is currently playing. If the Transport Player is
+            stopped or paused, the rotation event will be ignored
           default: false
           selector:
             boolean: {}
@@ -356,15 +372,18 @@ action:
       medium_rotation_max: !input medium_rotation_max
       medium_rotation_increment: !input medium_rotation_increment
       large_rotation_increment: !input large_rotation_increment
-      automated_player: !input automated_player
-      player_friendly_name: >
-        {{ state_attr(automated_player, 'friendly_name') | default(automated_player) }}
+      volume_player: !input volume_player
+      transport_player: !input transport_player
+      volume_player_friendly_name: >
+        {{ state_attr(volume_player, 'friendly_name') | default(volume_player) }}
+      transport_player_friendly_name: >
+        {{ state_attr(transport_player, 'friendly_name') | default(transport_player) }}
       remote: !input remote
       remote_friendly_name: >
         {{ device_attr(remote, 'name_by_user') | default(remote) }}
       volume_only_when_playing: !input volume_only_when_playing
       player_is_playing: >
-        {{ (command == 'step_with_on_off' and volume_only_when_playing) and is_state(automated_player, 'playing') }}
+        {{ (command == 'step_with_on_off' and volume_only_when_playing) and is_state(transport_player, 'playing') }}
   - choose:
     - conditions: "{{ logbook_enabled and not bad_step_event }}"
       sequence:
@@ -372,7 +391,7 @@ action:
         data:
           name: "{{ remote_friendly_name }} > "
           message: >
-            Player: {{ player_friendly_name }}, Command:
+            Volume Player: {{ volume_player_friendly_name }}, Transport Player: {{ transport_player_friendly_name }}, Command:
             {{ command }}  {% if command == 'step_with_on_off' %} , Step Mode: {{ step_mode}},
             Step Size: {{ step_size }}  {% endif %} -
   - choose:
@@ -382,7 +401,7 @@ action:
     - conditions: "{{ command == 'button_1_short_release' }}"
       sequence:
       - service: media_player.media_play_pause
-        entity_id: !input automated_player
+        entity_id: !input transport_player
     - conditions: "{{ command == 'button_1_hold' }}"
       sequence: !input button_1_long
     - conditions: "{{ command == 'button_1_long_release' }}"
@@ -412,7 +431,7 @@ action:
     - conditions: "{{ command == 'button_3_short_release' }}"
       sequence:
       - service: media_player.media_previous_track
-        entity_id: !input automated_player
+        entity_id: !input transport_player
     - conditions: "{{ command == 'button_3_hold' }}"
       sequence: !input button_3_long
     - conditions: "{{ command == 'button_3_long_release' }}"
@@ -428,7 +447,7 @@ action:
     - conditions: "{{ command == 'button_4_short_release' }}"
       sequence:
       - service: media_player.media_next_track
-        entity_id: !input automated_player
+        entity_id: !input transport_player
     - conditions: "{{ command == 'button_4_hold' }}"
       sequence: !input button_4_long
     - conditions: "{{ command == 'button_4_long_release' }}"
@@ -444,7 +463,7 @@ action:
     - conditions: "{{ command == 'step_with_on_off' }}"
       sequence:
       - variables:
-          current_volume: "{{ state_attr(automated_player, 'volume_level') }}"
+          current_volume: "{{ state_attr(volume_player, 'volume_level') }}"
           volume_change: >
             {% if step_size <= small_rotation_max %}
               {{ small_rotation_increment }}
@@ -472,7 +491,7 @@ action:
         - conditions: "{{ step_mode == 'StepMode.Up' }}"
           sequence:
           - service: media_player.volume_set
-            entity_id: !input automated_player
+            entity_id: !input volume_player
             data:
               volume_level: >
                 {% set new_volume = current_volume + (volume_change / 100) %}
@@ -489,7 +508,7 @@ action:
         - conditions: "{{ step_mode == 'StepMode.Down' }}"
           sequence:
           - service: media_player.volume_set
-            entity_id: !input automated_player
+            entity_id: !input volume_player
             data:
               volume_level: >
                 {% set new_volume = current_volume - (volume_change / 100) %} 
