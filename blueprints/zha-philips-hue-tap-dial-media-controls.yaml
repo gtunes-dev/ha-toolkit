@@ -1,0 +1,505 @@
+blueprint:
+  name: Philips Hue Tap Dial - Media Controls
+  domain: automation
+  homeassistant:
+    min_version: 2024.11.0
+  source_url: https://gist.github.com/gtunes-dev/2ac188572a88faa6cc3451dabcd98ee5
+  description: |
+    # Philips Hue Tap Dial - Media and Custom Controls
+
+    This blueprint enables a Philips Hue Tap Dial to act as a media controller while also allowing
+    for the configuration of custom events for long and multi-presses of the buttons.
+
+    If you don't plan to use your Hue Tap Dial as a media controller, there is another
+    blueprint available which allows full customizability of all controller events.
+    That blueprint can be found here:
+    https://community.home-assistant.io/t/zha-philips-hue-tap-switch-custom-controls-rdm002/789654
+
+    To use this current blueprint, simply select the Hue Tap Dial which will generate 
+    events and the Media device to be controlled.
+
+    ## Built-In Behaviors
+
+    **Button Layout**
+
+        |1 - Play          |  |2 - Custom    |
+        |3 - Previous Track|  |4 - Next Track|
+
+    * Button 1 toggles the play/pause state of the media player
+    * Button 3 navigates to the previous track
+    * Button 2 has no default behavior
+    * Button 4 navigates to the next track
+    * Volume increases and decreases with the rotation of the dial
+
+    ## Volume Control
+
+    When the controller's dial is rotated, the generated event will indicate the speed of rotation.
+    There are inputs in the blueprint below which allow you to specify how the blueprint should
+    interpret the speed and how it should change the volume. Descriptions are below.
+
+    ## Logbook Logging
+
+    When Logbook Logging is enabled, a logbook event will be generated each time an event is
+    received. In the case of a rotation event, a second event will be generated which describes
+    which rotation window the event maps to and, consequently, how the volume was adjusted.
+
+    The "Logbook" is accessed from the left navigation pane of Home Assistant.
+
+    ## Custom Events
+
+    You can additionally create custom events for long presses and releases as well as double,
+    triple, quadruple, and quintuple presses of each of the buttons. These custom events are optional.
+    There are no default behaviors.
+
+    Version History:
+    * 1.00 (Nov-02-2024) : Initial Release
+    * 1.01 (Nov 22-2024) : Fixed multi-press button events
+    * 1.02 (Jan-16-2025) : Ignore spurious rotation events. Fix errors caused by reading
+        non-existent params. Increase allowed values for Small and Medium Rotation Maximums
+        from 100 to 255 to accommodate large rotation values. Minor cleanups
+    * 1.03 (Jan-18-2025) : New feature - under volume controls, a new toggle to limit volume
+        changes to when the media player is actively playing. 
+        Thank you stephane1 for the suggestion!
+    * 1.04 (Jul-19-2025) : Fix spurious logbook warning in system log
+        Correctly respect Logbook Enabled input.
+        Increase likelihood that we'll be find and use the device's friendly name in logbook events.
+        Normalize logbook events for consisstency.
+        Thank you trevorwarwick for reporting this issue!
+    
+  input:
+    remote:
+      name: Philips Hue Tap Dial
+      selector:
+        device:
+          integration: zha
+          manufacturer: Signify Netherlands B.V.
+          model: RDM002
+          multiple: false
+    automated_player:
+      name: Media Player
+      description: The media player to control with this automation
+      selector:
+        entity:
+          domain:
+          - media_player
+          multiple: false
+    logbook_enabled:
+      name: Enable logging to Logbook
+      default: false
+      selector:
+        boolean: {}
+    volume_controls:
+      name: Volume Controls
+      icon: mdi:volume-high
+      collapsed: true
+      input:
+        volume_only_when_playing:
+          name: Adjust Volume Only When Playing
+          description: If enabled, rotating the dial will only adjust the volume if
+            the media player is currently playing. If the media player is stopped or
+            paused, the event will be ignored
+          default: false
+          selector:
+            boolean: {}
+        small_rotation_max:
+          name: Small Rotation Maximum
+          description: The maximum "Step Size" of a "Small Rotation". A rotation event
+            with a step size between 1 and this value (inclusively) will cause the
+            volume to increase or decrease by the "Small Rotation Increment" set below
+          default: 13
+          selector:
+            number:
+              min: 1.0
+              max: 255.0
+              step: 1.0
+              mode: box
+        medium_rotation_max:
+          name: Medium Rotation Maximum
+          description: The maximum "Step Size" of a "Medium Rotation". A rotation
+            even with a "Step Size" greater than the "Small Rotation Maximum", and
+            less than or equal to this value, will cause the volume to increase or
+            decrease by the "Medium Rotation Increment" set below. A rotation event
+            with a "Step Size" greater than this value will be treated as a "Large
+            Rotation"
+          default: 24
+          selector:
+            number:
+              min: 1.0
+              max: 255.0
+              step: 1.0
+              mode: box
+        small_rotation_increment:
+          name: Small Rotation Increment
+          description: The amount to increase or decrease the volume when a "Small
+            Rotation" occurs
+          default: 1
+          selector:
+            number:
+              min: 1.0
+              max: 10.0
+              step: 1.0
+              mode: slider
+        medium_rotation_increment:
+          name: Medium Rotation Increment
+          description: Amount to increase or decrease the volume for each "medium"
+            speed rotation of the dial
+          default: 3
+          selector:
+            number:
+              min: 1.0
+              max: 10.0
+              step: 1.0
+              mode: slider
+        large_rotation_increment:
+          name: Large Rotation Increment
+          description: A rotation even with a "Step Size" greater than the "Medium
+            Rotation Increment" set above, will increase or decrease the volume by
+            this amount
+          default: 5
+          selector:
+            number:
+              min: 1.0
+              max: 10.0
+              step: 1.0
+              mode: slider
+    button_1_custom:
+      name: Button 1 - Custom Actions
+      icon: mdi:numeric-1-circle-outline
+      collapsed: true
+      input:
+        button_1_long:
+          name: Button 1 (Long Press)
+          description: Action to run on a long press of Button 1. Will repeat while
+            the button is held
+          default: []
+          selector:
+            action: {}
+        button_1_long_release:
+          name: Button 1 (Long Release)
+          description: Action to run when Button 1 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_1_double:
+          name: Button 1 (Double Press)
+          description: Action to run on a double press of Button 1
+          default: []
+          selector:
+            action: {}
+        button_1_triple:
+          name: Button 1 (Triple Press)
+          description: Action to run on a triple press of Button 1
+          default: []
+          selector:
+            action: {}
+        button_1_quadruple:
+          name: Button 1 (Quadruple Press)
+          description: Action to run on a quadruple press of Button 1
+          default: []
+          selector:
+            action: {}
+        button_1_quintuple:
+          name: Button 1 (Quintiple Press)
+          description: Action to run on a quintuple press of Button 1
+          default: []
+          selector:
+            action: {}
+    button_2_custom:
+      name: Button 2 - Custom Actions
+      icon: mdi:numeric-2-circle-outline
+      collapsed: true
+      input:
+        button_2_short:
+          name: Button 2 (Short Press)
+          description: Action to run on a short press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_2_long:
+          name: Button 2 (Long Press)
+          description: Action to run on a long press of Button 2. Will repeat while
+            the button is held
+          default: []
+          selector:
+            action: {}
+        button_2_long_release:
+          name: Button 2 (Long Release)
+          description: Action to run when Button 2 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_2_double:
+          name: Button 2 (Double Press)
+          description: Action to run on a double press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_2_triple:
+          name: Button 2 (Triple Press)
+          description: Action to run on a triple press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_2_quadruple:
+          name: Button 2 (Quadruple Press)
+          description: Action to run on a quadruple press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_2_quintuple:
+          name: Button 2 (Quintiple Press)
+          description: Action to run on a quintuple press of Button 2
+          default: []
+          selector:
+            action: {}
+    button_3_custom:
+      name: Button 3 - Custom Actions
+      icon: mdi:numeric-3-circle-outline
+      collapsed: true
+      input:
+        button_3_long:
+          name: Button 3 (Long Press)
+          description: Action to run on a long press of Button 3. Will repeat while
+            the button is held
+          default: []
+          selector:
+            action: {}
+        button_3_long_release:
+          name: Button 3 (Long Release)
+          description: Action to run when Button 3 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_3_double:
+          name: Button 3 (Double Press)
+          description: Action to run on a double press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_3_triple:
+          name: Button 3 (Triple Press)
+          description: Action to run on a triple press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_3_quadruple:
+          name: Button 3 (Quadruple Press)
+          description: Action to run on a quadruple press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_3_quintuple:
+          name: Button 3 (Quintiple Press)
+          description: Action to run on a quintuple press of Button 3
+          default: []
+          selector:
+            action: {}
+    button_4_custom:
+      name: Button 4 - Custom Actions
+      icon: mdi:numeric-4-circle-outline
+      collapsed: true
+      input:
+        button_4_long:
+          name: Button 4 (Long Press)
+          description: Action to run on a long press of Button 4. Will repeat while
+            the button is held
+          default: []
+          selector:
+            action: {}
+        button_4_long_release:
+          name: Button 4 (Long Release)
+          description: Action to run when Button 4 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_4_double:
+          name: Button 4 (Double Press)
+          description: Action to run on a double press of Button 4
+          default: []
+          selector:
+            action: {}
+        button_4_triple:
+          name: Button 4 (Triple Press)
+          description: Action to run on a triple press of Button 4
+          default: []
+          selector:
+            action: {}
+        button_4_quadruple:
+          name: Button 4 (Quadruple Press)
+          description: Action to run on a quadruple press of Button 4
+          default: []
+          selector:
+            action: {}
+        button_4_quintuple:
+          name: Button 4 (Quintiple Press)
+          description: Action to run on a quintuple press of Button 4
+          default: []
+          selector:
+            action: {}
+mode: restart
+max_exceeded: silent
+trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+action:
+  - variables:
+      command: "{{ trigger.event.data.command }}"
+      logbook_enabled: !input logbook_enabled
+      step_mode: "{{ trigger.event.data.params.step_mode if command == 'step_with_on_off' }}"
+      step_size: "{{ trigger.event.data.params.step_size if command == 'step_with_on_off' }}"
+      bad_step_event: >
+        {{ command == 'step_with_on_off' and trigger.event.data.params.transition_time == 8 }}
+      small_rotation_max: !input small_rotation_max
+      small_rotation_increment: !input small_rotation_increment
+      medium_rotation_max: !input medium_rotation_max
+      medium_rotation_increment: !input medium_rotation_increment
+      large_rotation_increment: !input large_rotation_increment
+      automated_player: !input automated_player
+      player_friendly_name: >
+        {{ state_attr(automated_player, 'friendly_name') | default(automated_player) }}
+      remote: !input remote
+      remote_friendly_name: >
+        {{ device_attr(remote, 'name_by_user') | default(remote) }}
+      volume_only_when_playing: !input volume_only_when_playing
+      player_is_playing: >
+        {{ (command == 'step_with_on_off' and volume_only_when_playing) and is_state(automated_player, 'playing') }}
+  - choose:
+    - conditions: "{{ logbook_enabled and not bad_step_event }}"
+      sequence:
+      - service: logbook.log
+        data:
+          name: "{{ remote_friendly_name }} > "
+          message: >
+            Player: {{ player_friendly_name }}, Command:
+            {{ command }}  {% if command == 'step_with_on_off' %} , Step Mode: {{ step_mode}},
+            Step Size: {{ step_size }}  {% endif %} -
+  - choose:
+    - conditions: "{{ bad_step_event }}"
+      # This event is ignored. Short circuit immediately
+      sequence: []    
+    - conditions: "{{ command == 'button_1_short_release' }}"
+      sequence:
+      - service: media_player.media_play_pause
+        entity_id: !input automated_player
+    - conditions: "{{ command == 'button_1_hold' }}"
+      sequence: !input button_1_long
+    - conditions: "{{ command == 'button_1_long_release' }}"
+      sequence: !input button_1_long_release
+    - conditions: "{{ command == 'button_1_double_press' }}"
+      sequence: !input button_1_double
+    - conditions: "{{ command == 'button_1_triple_press' }}"
+      sequence: !input button_1_triple
+    - conditions: "{{ command == 'button_1_quadruple_press' }}"
+      sequence: !input button_1_quadruple
+    - conditions: "{{ command == 'button_1_quintuple_press' }}"
+      sequence: !input button_1_quintuple
+    - conditions: "{{ command == 'button_2_short_release' }}"
+      sequence: !input button_2_short
+    - conditions: "{{ command == 'button_2_hold' }}"
+      sequence: !input button_2_long
+    - conditions: "{{ command == 'button_2_long_release' }}"
+      sequence: !input button_2_long_release
+    - conditions: "{{ command == 'button_2_double_press' }}"
+      sequence: !input button_2_double
+    - conditions: "{{ command == 'button_2_triple_press' }}"
+      sequence: !input button_2_triple
+    - conditions: "{{ command == 'button_2_quadruple_press' }}"
+      sequence: !input button_2_quadruple
+    - conditions: "{{ command == 'button_2_quintuple_press' }}"
+      sequence: !input button_2_quintuple
+    - conditions: "{{ command == 'button_3_short_release' }}"
+      sequence:
+      - service: media_player.media_previous_track
+        entity_id: !input automated_player
+    - conditions: "{{ command == 'button_3_hold' }}"
+      sequence: !input button_3_long
+    - conditions: "{{ command == 'button_3_long_release' }}"
+      sequence: !input button_3_long_release
+    - conditions: "{{ command == 'button_3_double_press' }}"
+      sequence: !input button_3_double
+    - conditions: "{{ command == 'button_3_triple_press' }}"
+      sequence: !input button_3_triple
+    - conditions: "{{ command == 'button_3_quadruple_press' }}"
+      sequence: !input button_3_quadruple
+    - conditions: "{{ command == 'button_3_quintuple_press' }}"
+      sequence: !input button_3_quintuple
+    - conditions: "{{ command == 'button_4_short_release' }}"
+      sequence:
+      - service: media_player.media_next_track
+        entity_id: !input automated_player
+    - conditions: "{{ command == 'button_4_hold' }}"
+      sequence: !input button_4_long
+    - conditions: "{{ command == 'button_4_long_release' }}"
+      sequence: !input button_4_long_release
+    - conditions: "{{ command == 'button_4_double_press' }}"
+      sequence: !input button_4_double
+    - conditions: "{{ command == 'button_4_triple_press' }}"
+      sequence: !input button_4_triple
+    - conditions: "{{ command == 'button_4_quadruple_press' }}"
+      sequence: !input button_4_quadruple
+    - conditions: "{{ command == 'button_4_quintuple_press' }}"
+      sequence: !input button_4_quintuple
+    - conditions: "{{ command == 'step_with_on_off' }}"
+      sequence:
+      - variables:
+          current_volume: "{{ state_attr(automated_player, 'volume_level') }}"
+          volume_change: >
+            {% if step_size <= small_rotation_max %}
+              {{ small_rotation_increment }}
+            {% elif step_size <= medium_rotation_max %}
+              {{ medium_rotation_increment }}
+            {% else %}
+              {{ large_rotation_increment }}
+            {% endif %}
+          step_size_name: >
+            {% if step_size <= small_rotation_max %}
+              {{ "Small" }}
+            {% elif step_size <= medium_rotation_max %}
+              {{ "Medium" }}
+            {% else %}
+              {{ "Large" }}
+            {% endif %}
+      - choose:
+        - conditions: "{{ logbook_enabled and volume_only_when_playing and not player_is_playing }}"
+          sequence:
+          - service: logbook.log
+            data:
+              name: "{{ remote_friendly_name }} > "
+              message: >
+                Player not playing - ignoring rotation event -
+        - conditions: "{{ step_mode == 'StepMode.Up' }}"
+          sequence:
+          - service: media_player.volume_set
+            entity_id: !input automated_player
+            data:
+              volume_level: >
+                {% set new_volume = current_volume + (volume_change / 100) %}
+                {{ 1.0 if new_volume > 1.0 else new_volume }}
+          - choose:
+            - conditions: "{{ logbook_enabled }}"
+              sequence:
+              - service: logbook.log
+                data:
+                  name: "{{ remote_friendly_name }} > "
+                  message: >
+                    Increase Volume - {{ step_size_name }} Increment (Step Size:
+                    {{ step_size }}, Volume Change: {{ volume_change }}) -
+        - conditions: "{{ step_mode == 'StepMode.Down' }}"
+          sequence:
+          - service: media_player.volume_set
+            entity_id: !input automated_player
+            data:
+              volume_level: >
+                {% set new_volume = current_volume - (volume_change / 100) %} 
+                {{ 0.0 if new_volume < 0.0 else new_volume }}
+          - choose:
+            - conditions: "{{ logbook_enabled and not bad_step_event }}"
+              sequence:
+              - service: logbook.log
+                data:
+                  name: "{{ remote_friendly_name }} > "
+                  message: >
+                    Decrease Volume - {{ step_size_name }} Increment (Step Size:
+                    {{ step_size }}, Volume Change: {{ volume_change }}) -
