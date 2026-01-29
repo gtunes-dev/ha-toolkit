@@ -1,6 +1,12 @@
 # FiiO K17 Control
 
-A Home Assistant custom integration for controlling the FiiO K17 DAC/Amp over your local network.
+A Home Assistant custom integration for controlling the FiiO K17 DAC/Amp volume over your local network.
+
+I built this integration because I wanted to use my [Philips Hue Tap Dial Switch](https://community.home-assistant.io/t/zha-philips-hue-tap-switch-mini-custom-controls-rdm002/789654) (for which I also wrote a blueprint) to control my K17's volume. Now you can adjust the K17's volume from any Home Assistant automation, dashboard, or physical controller.
+
+**Note:** This integration only supports volume control. The K17's network protocol does not support transport controls (play/pause/skip) when using streaming sources like USB or Bluetooth.
+
+> **⚠️ Single Connection Limit:** The K17 only accepts one network connection at a time. When this integration is connected, you cannot use the FiiO Control phone app (and vice versa). This is a hardware limitation of the device.
 
 ## Features
 
@@ -16,8 +22,6 @@ A Home Assistant custom integration for controlling the FiiO K17 DAC/Amp over yo
 
 ## Installation
 
-### Option 1: Manual Installation
-
 1. Download or clone this repository
 
 2. Copy the `custom_components/fiio_k17` folder to your Home Assistant config directory:
@@ -26,10 +30,6 @@ A Home Assistant custom integration for controlling the FiiO K17 DAC/Amp over yo
    ```
 
 3. Restart Home Assistant
-
-### Option 2: HACS (Home Assistant Community Store)
-
-*Coming soon* - This integration is not yet available in HACS.
 
 ## Configuration
 
@@ -63,6 +63,34 @@ automation:
           entity_id: media_player.fiio_k17
         data:
           volume_level: 0.5
+```
+
+### Advanced: Volume Increment/Decrement
+
+For rotary controllers or buttons that need to adjust volume by a specific step (e.g., +3 or -3), you can read the current volume and apply a delta:
+
+```yaml
+# Increase volume by 3
+action:
+  - variables:
+      current: "{{ state_attr('media_player.fiio_k17', 'volume_level') | float(0) }}"
+      step: 0.03
+  - service: media_player.volume_set
+    target:
+      entity_id: media_player.fiio_k17
+    data:
+      volume_level: "{{ [1.0, current + step] | min }}"
+
+# Decrease volume by 3
+action:
+  - variables:
+      current: "{{ state_attr('media_player.fiio_k17', 'volume_level') | float(0) }}"
+      step: 0.03
+  - service: media_player.volume_set
+    target:
+      entity_id: media_player.fiio_k17
+    data:
+      volume_level: "{{ [0.0, current - step] | max }}"
 ```
 
 ## Troubleshooting
