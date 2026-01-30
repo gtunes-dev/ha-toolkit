@@ -63,7 +63,7 @@ The official app sends additional commands for playlist/track features:
 
 ```
 Client → K17: 0607000c0000
-K17 → Client: a607000C0007
+K17 → Client: a607000C00XX       (XX = input mode, see below)
 
 Client → K17: 062700100000A0A9
 K17 → Client: a62700AC... (playlist data)
@@ -71,11 +71,22 @@ K17 → Client: a62700AC... (playlist data)
 Client → K17: 0639000c0000
 K17 → Client: a639000C00FF
 
-Client → K17: 062800100000001E
-K17 → Client: a62801C2... (track info)
+Client → K17: 0628001000000YYY
+K17 → Client: a62801C2... (track/volume table info)
 ```
 
 These are not required for volume control.
+
+### Input Mode (Command 0607)
+
+The `0607` command returns the current input mode:
+
+| Response | Mode |
+|----------|------|
+| `a607000C0001` | USB |
+| `a607000C0007` | Streaming |
+
+The volume control protocol (`0502`) works identically in both modes.
 
 ---
 
@@ -143,7 +154,7 @@ The response format is `a501009C{json}` where `9C` (156) is the JSON length.
 | `02` | `05`/`a5` | SET_VOLUME | `0502000c00XX` | `a502000C00XX` |
 | `02` | `a5` | VOLUME_PUSH | N/A (unsolicited) | `a502000C00XX` |
 | `0a` | `a6` | NOTIFY | N/A (unsolicited) | `a60a000C000C` |
-| `07` | `06`/`a6` | UNKNOWN | `0607000c0000` | `a607000C0007` |
+| `07` | `06`/`a6` | GET_INPUT_MODE | `0607000c0000` | `a607000C00XX` (01=USB, 07=Streaming) |
 | `27` | `06`/`a6` | GET_PLAYLIST? | `062700100000A0A9` | `a62700AC...` |
 | `39` | `06`/`a6` | UNKNOWN | `0639000c0000` | `a639000C00FF` |
 | `28` | `06`/`a6` | GET_TRACK_INFO? | `062800100000001E` | `a62801C2...` |
@@ -172,14 +183,38 @@ Messages appear to be complete per TCP read (no explicit framing). The implement
 
 ---
 
+## Connection Management
+
+### Connection Stability
+
+The K17 connection can be dropped by:
+- Switching input modes on the device (USB ↔ Streaming)
+- Device reboot/power cycle
+- Network interruptions
+- Idle timeout (duration unknown, but observed in practice)
+
+### Recommended Client Implementation
+
+For robust operation, clients should implement:
+
+1. **Health check**: Periodically send `GET_SETTINGS` (every 30-60 seconds) to verify the connection is alive and keep settings in sync.
+
+2. **Automatic reconnection**: On connection loss, attempt to reconnect with exponential backoff (e.g., 5s → 10s → 20s → 30s max).
+
+3. **Graceful degradation**: Track connection state and surface it to users (e.g., "unavailable" status in Home Assistant).
+
+### No Explicit Keep-Alive Protocol
+
+The device does not appear to require or respond to explicit keep-alive messages. The `a60a000C000C` notifications sent by the device could theoretically serve as implicit keep-alives, but their timing is unpredictable.
+
+---
+
 ## Open Questions
 
-1. ~~Minimal Handshake~~ - **Answered:** INIT + GET_SETTINGS is sufficient
-2. **Keep-Alive:** Does K17 drop idle connections? Timeout unknown.
-3. ~~Multiple Clients~~ - **Answered:** No, single client only
-4. **Settings Changes:** Can settings be modified via protocol?
-5. **Error Handling:** Response to invalid commands unknown
-6. **Prefix 0x06 vs 0x05:** Both are request prefixes; difference unknown
+1. **Settings Changes:** Can settings (gaplessPlay, etc.) be modified via protocol?
+2. **Error Handling:** Response format for invalid commands is unknown.
+3. **Idle Timeout:** Exact duration before device drops idle connections is unknown.
+4. **Prefix 0x06 vs 0x05:** Both are request prefixes; semantic difference unknown (possibly streaming vs USB-related).
 
 ---
 
@@ -188,6 +223,7 @@ Messages appear to be complete per TCP read (no explicit framing). The implement
 - **Device:** FiiO K17 DAC/Amp
 - **Firmware:** 3.02 (inferred from handshake)
 - **Control App:** FiiO Control (macOS)
+- **Tested Modes:** USB and Streaming (volume control verified in both)
 
 ---
 

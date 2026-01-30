@@ -57,6 +57,7 @@ class FiiOK17MediaPlayer(MediaPlayerEntity):
         # Register callbacks for device events
         self._client.on_volume_change = self._on_volume_change
         self._client.on_disconnect = self._on_disconnect
+        self._client.on_reconnect = self._on_reconnect
 
     @property
     def available(self) -> bool:
@@ -112,5 +113,11 @@ class FiiOK17MediaPlayer(MediaPlayerEntity):
     @callback
     def _on_disconnect(self) -> None:
         """Handle disconnect from device."""
-        _LOGGER.warning("FiiO K17 at %s disconnected", self._host)
+        _LOGGER.warning("FiiO K17 at %s disconnected, will attempt reconnection", self._host)
+        self.async_write_ha_state()
+
+    @callback
+    def _on_reconnect(self) -> None:
+        """Handle successful reconnection to device."""
+        _LOGGER.info("FiiO K17 at %s reconnected", self._host)
         self.async_write_ha_state()

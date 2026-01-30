@@ -19,12 +19,18 @@ CMD_GET_SETTINGS = "05010008"
 CMD_SET_VOLUME_PREFIX = "0502000c"
 RESP_VOLUME = "a502"
 
+# Health check and reconnection constants
+HEALTH_CHECK_INTERVAL = 30  # seconds
+RECONNECT_BASE_DELAY = 5  # seconds
+RECONNECT_MAX_DELAY = 30  # seconds
+
 
 class FiiOK17Client:
     """Async client for FiiO K17 DAC/Amp.
 
     Uses a single reader task to avoid concurrent read issues.
     Commands request responses via a Future that the reader fulfills.
+    Includes automatic health checks and reconnection with exponential backoff.
     """
 
     def __init__(self, host: str, port: int = DEFAULT_PORT) -> None:
@@ -35,7 +41,11 @@ class FiiOK17Client:
         self._writer: asyncio.StreamWriter | None = None
         self._connected = False
         self._reader_task: asyncio.Task | None = None
+        self._health_check_task: asyncio.Task | None = None
+        self._reconnect_task: asyncio.Task | None = None
         self._settings: dict[str, Any] = {}
+        self._shutting_down = False
+        self._reconnect_delay = RECONNECT_BASE_DELAY
 
         # For command/response coordination
         self._response_future: asyncio.Future[str] | None = None
@@ -44,6 +54,7 @@ class FiiOK17Client:
         # Callbacks
         self.on_volume_change: Callable[[int], None] | None = None
         self.on_disconnect: Callable[[], None] | None = None
+        self.on_reconnect: Callable[[], None] | None = None
 
     @property
     def connected(self) -> bool:
@@ -68,6 +79,7 @@ class FiiOK17Client:
                 timeout=5.0,
             )
             self._connected = True
+            self._reconnect_delay = RECONNECT_BASE_DELAY  # Reset on successful connect
 
             # Handshake sequence (before reader task starts)
             await self._send_command(CMD_INIT)
@@ -82,6 +94,10 @@ class FiiOK17Client:
             # Start the single reader task
             self._reader_task = asyncio.create_task(self._reader_loop())
 
+            # Start health check task
+            self._health_check_task = asyncio.create_task(self._health_check_loop())
+
+            _LOGGER.info("Connected to FiiO K17 at %s:%d", self.host, self.port)
             return self._settings
 
         except (OSError, asyncio.TimeoutError) as err:
@@ -89,9 +105,29 @@ class FiiOK17Client:
             raise ConnectionError(f"Failed to connect to {self.host}:{self.port}") from err
 
     async def disconnect(self) -> None:
-        """Close the connection."""
+        """Close the connection and stop all background tasks."""
+        self._shutting_down = True
         self._connected = False
 
+        # Cancel health check task
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+
+        # Cancel reconnect task
+        if self._reconnect_task:
+            self._reconnect_task.cancel()
+            try:
+                await self._reconnect_task
+            except asyncio.CancelledError:
+                pass
+            self._reconnect_task = None
+
+        # Cancel reader task
         if self._reader_task:
             self._reader_task.cancel()
             try:
@@ -100,12 +136,47 @@ class FiiOK17Client:
                 pass
             self._reader_task = None
 
+        # Close the socket
         if self._writer:
             self._writer.close()
             try:
                 await self._writer.wait_closed()
             except OSError:
                 pass  # Connection already closed
+            self._writer = None
+            self._reader = None
+
+        _LOGGER.info("Disconnected from FiiO K17 at %s", self.host)
+
+    async def _close_connection(self) -> None:
+        """Close the socket connection without stopping reconnection."""
+        self._connected = False
+
+        # Cancel health check task
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+
+        # Cancel reader task
+        if self._reader_task:
+            self._reader_task.cancel()
+            try:
+                await self._reader_task
+            except asyncio.CancelledError:
+                pass
+            self._reader_task = None
+
+        # Close the socket
+        if self._writer:
+            self._writer.close()
+            try:
+                await self._writer.wait_closed()
+            except OSError:
+                pass
             self._writer = None
             self._reader = None
 
@@ -195,13 +266,12 @@ class FiiOK17Client:
             except asyncio.CancelledError:
                 break
             except (ConnectionResetError, BrokenPipeError, OSError) as err:
-                _LOGGER.debug("Connection lost: %s", err)
-                self._connected = False
+                _LOGGER.debug("Connection error in reader loop: %s", err)
                 # Cancel any waiting command
                 if self._response_future and not self._response_future.done():
                     self._response_future.set_exception(ConnectionError("Disconnected"))
-                if self.on_disconnect:
-                    self.on_disconnect()
+                # Trigger reconnection (don't await - let it run in background)
+                asyncio.create_task(self._handle_connection_lost())
                 break
 
     def _handle_push_message(self, message: str) -> None:
@@ -214,6 +284,88 @@ class FiiOK17Client:
                     self.on_volume_change(volume)
             except ValueError:
                 pass
+
+    async def _health_check_loop(self) -> None:
+        """Periodically check connection health by querying settings."""
+        while self._connected and not self._shutting_down:
+            try:
+                await asyncio.sleep(HEALTH_CHECK_INTERVAL)
+
+                if not self._connected or self._shutting_down:
+                    break
+
+                # Try to get settings as a health check
+                _LOGGER.debug("Health check: querying settings")
+                response = await self._send_and_receive(CMD_GET_SETTINGS)
+
+                if response:
+                    self._parse_settings_response(response)
+                    _LOGGER.debug("Health check OK, volume: %d", self.volume)
+                else:
+                    # No response - connection may be dead
+                    _LOGGER.warning("Health check failed: no response")
+                    await self._handle_connection_lost()
+                    break
+
+            except asyncio.CancelledError:
+                break
+            except Exception as err:
+                _LOGGER.warning("Health check error: %s", err)
+                await self._handle_connection_lost()
+                break
+
+    async def _handle_connection_lost(self) -> None:
+        """Handle connection loss - close and start reconnection."""
+        if self._shutting_down:
+            return
+
+        _LOGGER.warning("Connection lost to FiiO K17 at %s", self.host)
+
+        # Close the current connection
+        await self._close_connection()
+
+        # Notify listeners
+        if self.on_disconnect:
+            self.on_disconnect()
+
+        # Start reconnection task if not already running
+        if not self._reconnect_task or self._reconnect_task.done():
+            self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+
+    async def _reconnect_loop(self) -> None:
+        """Attempt to reconnect with exponential backoff."""
+        while not self._shutting_down and not self._connected:
+            _LOGGER.info(
+                "Attempting to reconnect to FiiO K17 at %s in %d seconds",
+                self.host,
+                self._reconnect_delay,
+            )
+
+            await asyncio.sleep(self._reconnect_delay)
+
+            if self._shutting_down:
+                break
+
+            try:
+                await self.connect()
+                _LOGGER.info("Reconnected to FiiO K17 at %s", self.host)
+
+                # Notify listeners of successful reconnection
+                if self.on_reconnect:
+                    self.on_reconnect()
+
+                break  # Success - exit reconnection loop
+
+            except (ConnectionError, OSError, asyncio.TimeoutError) as err:
+                _LOGGER.warning("Reconnection attempt failed: %s", err)
+
+                # Exponential backoff
+                self._reconnect_delay = min(
+                    self._reconnect_delay * 2, RECONNECT_MAX_DELAY
+                )
+
+            except asyncio.CancelledError:
+                break
 
     async def _send_command(self, cmd: str) -> None:
         """Send a command to the device."""
