@@ -1,0 +1,111 @@
+blueprint:
+  name: Now Playing Display Sync
+  domain: automation
+  homeassistant:
+    min_version: 2024.6.0
+  description: |
+    # Now Playing Display Sync
+
+    Automatically activates a display when a media player starts playing and deactivates it
+    after playback stops, with a configurable delay.
+
+    This is useful for "Now Playing" screens that should only be active during playback—
+    such as a tablet showing album art, a TV displaying a music visualizer, or any display
+    that should sleep when not in use.
+
+    ## How It Works
+
+    * When the media player starts **playing**, the "Display On Action" runs immediately
+    * When the media player changes to **paused**, **idle**, or **off**, a countdown begins
+    * If playback resumes before the delay expires, the countdown is canceled
+    * If the delay expires without playback resuming, the "Display Off Action" runs
+
+    ## Configuration
+
+    * **Media Player**: The player to monitor for playback state changes
+    * **Off Delay**: How long to wait after playback stops before running the off action
+    * **Display On Action**: Custom action(s) to activate the display (e.g., turn on a switch,
+      wake a screen, launch an app)
+    * **Display Off Action**: Custom action(s) to deactivate the display (e.g., turn off a switch,
+      trigger sleep mode, close an app)
+
+    ## Use Cases
+
+    * Turn a smart plug on/off to control a dedicated "Now Playing" screen
+    * Send wake/sleep commands to a tablet or display
+    * Switch TV inputs or launch/close apps
+    * Trigger scenes that adjust lighting along with the display
+
+    Version History:
+    * 1.00 (Feb-01-2026) : Initial Release
+
+  input:
+    media_player:
+      name: Media Player
+      description: The media player to monitor for playback state changes
+      selector:
+        entity:
+          domain:
+            - media_player
+          multiple: false
+    delay_duration:
+      name: Off Delay
+      description: How long to wait after playback stops before running the off action
+      default:
+        minutes: 1
+      selector:
+        duration:
+          enable_day: false
+    display_on_action:
+      name: Display On Action
+      description: Action(s) to run when playback starts
+      default: []
+      selector:
+        action: {}
+    display_off_action:
+      name: Display Off Action
+      description: Action(s) to run after playback stops and the delay expires
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input media_player
+    to: playing
+    id: playing
+  - platform: state
+    entity_id: !input media_player
+    to: paused
+    id: stopped
+  - platform: state
+    entity_id: !input media_player
+    to: idle
+    id: stopped
+  - platform: state
+    entity_id: !input media_player
+    to: "off"
+    id: stopped
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: playing
+        sequence: !input display_on_action
+      - conditions:
+          - condition: trigger
+            id: stopped
+        sequence:
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input media_player
+                to: playing
+            timeout: !input delay_duration
+            continue_on_timeout: true
+          - condition: template
+            value_template: "{{ wait.trigger is none }}"
+          - sequence: !input display_off_action
