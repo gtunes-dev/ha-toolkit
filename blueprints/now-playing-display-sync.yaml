@@ -3,6 +3,7 @@ blueprint:
   domain: automation
   homeassistant:
     min_version: 2024.6.0
+  source_url: https://gist.github.com/gtunes-dev/f7c1f22c12308cf89f67f38ffb61fdad
   description: |
     # Now Playing Display Sync
 
@@ -16,9 +17,11 @@ blueprint:
     ## How It Works
 
     * When the media player starts **playing**, the "Display On Action" runs immediately
-    * When the media player changes to **paused**, **idle**, or **off**, a countdown begins
+    * When the media player transitions from **playing** to any non-playing state
+      (paused, idle, off, standby, unavailable, unknown), a countdown begins
     * If playback resumes before the delay expires, the countdown is canceled
     * If the delay expires without playback resuming, the "Display Off Action" runs
+    * On Home Assistant restart, if the media player is already playing, the "Display On Action" runs
 
     ## Configuration
 
@@ -38,6 +41,9 @@ blueprint:
 
     Version History:
     * 1.00 (Feb-01-2026) : Initial Release
+    * 1.01 (Feb-01-2026) : Only start off-delay when transitioning from playing state.
+        Add handling for standby, unavailable, and unknown states.
+        Run on-action on HA restart if already playing.
 
   input:
     media_player:
@@ -79,22 +85,51 @@ trigger:
     id: playing
   - platform: state
     entity_id: !input media_player
+    from: playing
     to: paused
     id: stopped
   - platform: state
     entity_id: !input media_player
+    from: playing
     to: idle
     id: stopped
   - platform: state
     entity_id: !input media_player
+    from: playing
     to: "off"
     id: stopped
+  - platform: state
+    entity_id: !input media_player
+    from: playing
+    to: standby
+    id: stopped
+  - platform: state
+    entity_id: !input media_player
+    from: playing
+    to: unavailable
+    id: stopped
+  - platform: state
+    entity_id: !input media_player
+    from: playing
+    to: unknown
+    id: stopped
+  - platform: homeassistant
+    event: start
+    id: ha_start
 
 action:
+  - variables:
+      media_player_entity: !input media_player
   - choose:
       - conditions:
           - condition: trigger
             id: playing
+        sequence: !input display_on_action
+      - conditions:
+          - condition: trigger
+            id: ha_start
+          - condition: template
+            value_template: "{{ states(media_player_entity) == 'playing' }}"
         sequence: !input display_on_action
       - conditions:
           - condition: trigger
