@@ -37,9 +37,12 @@ class FiiOK17MediaPlayer(MediaPlayerEntity):
 
     _attr_has_entity_name = True
     _attr_name = None  # Use device name only
+    # VOLUME_MUTE is advertised for compatibility, but the FiiO K17 protocol
+    # does not expose true mute functionality. Mute sets volume to 0.
     _attr_supported_features = (
         MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.VOLUME_STEP
+        | MediaPlayerEntityFeature.VOLUME_MUTE
     )
 
     def __init__(self, client: FiiOK17Client, host: str) -> None:
@@ -78,6 +81,29 @@ class FiiOK17MediaPlayer(MediaPlayerEntity):
         if not self._client.connected:
             return None
         return self._client.volume / 100.0
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        """Return True if volume is muted (volume is 0).
+
+        Note: The FiiO K17 protocol does not expose true mute functionality.
+        Volume 0 is treated as muted.
+        """
+        if not self._client.connected:
+            return None
+        return self._client.volume == 0
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        """Mute sets volume to 0, unmute is ignored.
+
+        Note: The FiiO K17 protocol does not expose true mute functionality.
+        Muting sets volume to 0; unmuting is a no-op (user must adjust volume).
+        """
+        if mute:
+            success = await self._client.set_volume(0)
+            if not success:
+                _LOGGER.warning("Failed to mute volume")
+            self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level (0.0 to 1.0)."""
