@@ -7,6 +7,14 @@
         "data": {
           "host": "IP Address"
         }
+      },
+      "configure": {
+        "title": "Configure Device",
+        "description": "Connection successful! Give your device a name and optionally assign it to an area.",
+        "data": {
+          "name": "Device Name",
+          "area": "Area"
+        }
       }
     },
     "error": {

@@ -12,6 +12,7 @@ from homeassistant.components.media_player import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .client import FiiOK17Client
@@ -27,9 +28,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up FiiO K17 media player from a config entry."""
     client: FiiOK17Client = hass.data[DOMAIN][entry.entry_id]
-    host = entry.data[CONF_HOST]
 
-    async_add_entities([FiiOK17MediaPlayer(client, host)])
+    async_add_entities([FiiOK17MediaPlayer(client, entry)])
 
 
 class FiiOK17MediaPlayer(MediaPlayerEntity):
@@ -45,17 +45,26 @@ class FiiOK17MediaPlayer(MediaPlayerEntity):
         | MediaPlayerEntityFeature.VOLUME_MUTE
     )
 
-    def __init__(self, client: FiiOK17Client, host: str) -> None:
+    def __init__(self, client: FiiOK17Client, entry: ConfigEntry) -> None:
         """Initialize the media player."""
         self._client = client
-        self._host = host
-        self._attr_unique_id = f"fiio_k17_{host}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, host)},
-            "name": f"FiiO K17 ({host})",
-            "manufacturer": "FiiO",
-            "model": "K17",
-        }
+        self._host = entry.data[CONF_HOST]
+
+        # Use entry_id for unique_id (matches Eversolo pattern)
+        self._attr_unique_id = f"{entry.entry_id}_media_player"
+
+        # Build device info - use entry_id as identifier, title as name
+        device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,
+            manufacturer="FiiO",
+            model="K17",
+        )
+        # Add suggested area if provided during setup
+        if area := entry.data.get("area"):
+            device_info["suggested_area"] = area
+
+        self._attr_device_info = device_info
 
         # Register callbacks for device events
         self._client.on_volume_change = self._on_volume_change
