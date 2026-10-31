@@ -3,6 +3,7 @@ blueprint:
   domain: automation
   homeassistant:
     min_version: 2024.11.0
+  source_url: https://github.com/gtunes-dev/ha-toolkit/blob/main/blueprints/zha-candeo-sr5br-media-controls.yaml
   description: |
     # Candeo 5-Button Remote with Rotary Dial - Media Controls (ZHA)
 
@@ -28,22 +29,27 @@ blueprint:
     The remote reports each "click" of the dial as a separate event; it does not report the
     speed of rotation. Each click changes the volume by the "Volume Increment" set below.
 
-    ## Logbook Logging
+    Rotating the dial will never raise the volume above the "Maximum Volume" set below. If the
+    volume is already above the maximum (for example, because it was set from another app),
+    rotating right does nothing; rotating left lowers the volume as usual.
 
-    When Logbook Logging is enabled, a logbook event will be generated each time an event is
-    received. In the case of a rotation event, a second event will be generated which describes
-    how the volume was adjusted.
+    ## Activity Logging (Troubleshooting)
 
-    The "Logbook" is accessed from the left navigation pane of Home Assistant.
+    This option is intended for troubleshooting only and should normally be left off. When
+    enabled, an entry is written to the Activity log each time the blueprint handles an event
+    from the remote. In the case of a rotation event, a second entry describes how the volume
+    was adjusted.
+
+    The "Activity" log is accessed from the left navigation pane of Home Assistant.
 
     ## Custom Actions
 
     You can additionally create custom actions for single presses of Buttons 3 and 4, and for
-    double presses of all five buttons. These custom actions are optional. There are no default
-    behaviors.
+    double presses, long presses, and long press releases of all five buttons. These custom
+    actions are optional. There are no default behaviors.
 
     Version History:
-    * 1.00 (Oct-30-2026) : Initial Release
+    * 1.00 (Oct-31-2026) : Initial Release
 
   input:
     remote:
@@ -71,8 +77,11 @@ blueprint:
           domain:
           - media_player
           multiple: false
-    logbook_enabled:
-      name: Enable logging to Logbook
+    activity_logging_enabled:
+      name: Enable Activity Logging (Troubleshooting Only)
+      description: Writes an entry to the Activity log for each remote event and
+        volume change handled by this blueprint. Intended for troubleshooting;
+        leave off for normal use
       default: false
       selector:
         boolean: {}
@@ -92,13 +101,30 @@ blueprint:
         volume_increment:
           name: Volume Increment
           description: The amount to increase or decrease the volume for each click
-            of the dial
+            of the dial, in percent of full volume (the same scale as the volume
+            slider in Home Assistant)
           default: 2
           selector:
             number:
               min: 1.0
               max: 10.0
               step: 1.0
+              unit_of_measurement: "%"
+              mode: slider
+        max_volume:
+          name: Maximum Volume
+          description: Rotating the dial will never raise the volume above this
+            level, in percent of full volume (the same scale as the volume slider
+            in Home Assistant). If the volume is already above this level,
+            rotating right is ignored. This only limits the remote's dial; it does
+            not limit volume changes made any other way
+          default: 100
+          selector:
+            number:
+              min: 1.0
+              max: 100.0
+              step: 1.0
+              unit_of_measurement: "%"
               mode: slider
     single_press_custom:
       name: Single Press - Custom Actions
@@ -152,25 +178,235 @@ blueprint:
           default: []
           selector:
             action: {}
+    long_press_custom:
+      name: Long Press - Custom Actions
+      icon: mdi:gesture-tap-hold
+      collapsed: true
+      input:
+        button_1_long:
+          name: Button 1 (Long Press)
+          description: Action to run on a long press of Button 1
+          default: []
+          selector:
+            action: {}
+        button_2_long:
+          name: Button 2 (Long Press)
+          description: Action to run on a long press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_3_long:
+          name: Button 3 (Long Press)
+          description: Action to run on a long press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_4_long:
+          name: Button 4 (Long Press)
+          description: Action to run on a long press of Button 4
+          default: []
+          selector:
+            action: {}
+        button_centre_long:
+          name: Center Button (Long Press)
+          description: Action to run on a long press of the Center button
+          default: []
+          selector:
+            action: {}
+    long_release_custom:
+      name: Long Release - Custom Actions
+      icon: mdi:gesture-tap-button
+      collapsed: true
+      input:
+        button_1_long_release:
+          name: Button 1 (Long Release)
+          description: Action to run when Button 1 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_2_long_release:
+          name: Button 2 (Long Release)
+          description: Action to run when Button 2 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_3_long_release:
+          name: Button 3 (Long Release)
+          description: Action to run when Button 3 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_4_long_release:
+          name: Button 4 (Long Release)
+          description: Action to run when Button 4 is released after a long press
+          default: []
+          selector:
+            action: {}
+        button_centre_long_release:
+          name: Center Button (Long Release)
+          description: Action to run when the Center button is released after a long
+            press
+          default: []
+          selector:
+            action: {}
 # Each click of the dial arrives as its own event, often in quick bursts. Queue them
 # rather than restarting so that no clicks are dropped.
 mode: queued
 max: 20
 max_exceeded: silent
+# ZHA device triggers. Only the events this blueprint acts on are listed; the remote's
+# stopped rotating events never start a run.
 triggers:
-  - trigger: event
-    event_type: zha_event
-    event_data:
-      device_id: !input remote
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_short_press
+    subtype: button_centre
+    id: button_centre_press
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_short_press
+    subtype: button_1
+    id: button_1_press
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_short_press
+    subtype: button_2
+    id: button_2_press
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_short_press
+    subtype: button_3
+    id: button_3_press
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_short_press
+    subtype: button_4
+    id: button_4_press
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_double_press
+    subtype: button_centre
+    id: button_centre_double
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_double_press
+    subtype: button_1
+    id: button_1_double
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_double_press
+    subtype: button_2
+    id: button_2_double
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_double_press
+    subtype: button_3
+    id: button_3_double
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_double_press
+    subtype: button_4
+    id: button_4_double
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_press
+    subtype: button_centre
+    id: button_centre_long
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_press
+    subtype: button_1
+    id: button_1_long
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_press
+    subtype: button_2
+    id: button_2_long
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_press
+    subtype: button_3
+    id: button_3_long
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_press
+    subtype: button_4
+    id: button_4_long
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_release
+    subtype: button_centre
+    id: button_centre_long_release
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_release
+    subtype: button_1
+    id: button_1_long_release
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_release
+    subtype: button_2
+    id: button_2_long_release
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_release
+    subtype: button_3
+    id: button_3_long_release
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: remote_button_long_release
+    subtype: button_4
+    id: button_4_long_release
+  # Started and continued rotation are both a single click of the dial
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: rotary_knob_started_rotating
+    subtype: right
+    id: rotate_right
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: rotary_knob_continued_rotating
+    subtype: right
+    id: rotate_right
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: rotary_knob_started_rotating
+    subtype: left
+    id: rotate_left
+  - trigger: device
+    domain: zha
+    device_id: !input remote
+    type: rotary_knob_continued_rotating
+    subtype: left
+    id: rotate_left
 actions:
   - variables:
-      command: "{{ trigger.event.data.command }}"
-      event_args: "{{ trigger.event.data.args if trigger.event.data.args is mapping else {} }}"
-      button: "{{ event_args.get('button', '') }}"
-      direction: "{{ event_args.get('device_rotated', '') }}"
-      is_rotation: "{{ command in ['started_rotating', 'continued_rotating'] }}"
-      logbook_enabled: !input logbook_enabled
+      activity_logging_enabled: !input activity_logging_enabled
       volume_increment: !input volume_increment
+      max_volume: !input max_volume
       volume_player: !input volume_player
       transport_player: !input transport_player
       volume_player_friendly_name: >
@@ -183,55 +419,75 @@ actions:
       volume_only_when_playing: !input volume_only_when_playing
   - if:
       - condition: template
-        value_template: "{{ logbook_enabled }}"
+        value_template: "{{ activity_logging_enabled }}"
     then:
       - action: logbook.log
         data:
           name: "{{ remote_friendly_name }} > "
           message: >
-            Volume Player: {{ volume_player_friendly_name }}, Transport Player: {{ transport_player_friendly_name }}, Command:
-            {{ command }}{% if button %}, Button: {{ button }}{% endif %}{% if direction %}, Direction: {{ direction }}{% endif %} -
+            Volume Player: {{ volume_player_friendly_name }}, Transport Player: {{ transport_player_friendly_name }},
+            Event: {{ trigger.id }} -
   - choose:
-    - conditions: "{{ command == 'press' and button == 'button_centre' }}"
+    - conditions: "{{ trigger.id == 'button_centre_press' }}"
       sequence:
       - action: media_player.media_play_pause
         target:
           entity_id: !input transport_player
-    - conditions: "{{ command == 'press' and button == 'button_1' }}"
+    - conditions: "{{ trigger.id == 'button_1_press' }}"
       sequence:
       - action: media_player.media_previous_track
         target:
           entity_id: !input transport_player
-    - conditions: "{{ command == 'press' and button == 'button_2' }}"
+    - conditions: "{{ trigger.id == 'button_2_press' }}"
       sequence:
       - action: media_player.media_next_track
         target:
           entity_id: !input transport_player
-    - conditions: "{{ command == 'press' and button == 'button_3' }}"
+    - conditions: "{{ trigger.id == 'button_3_press' }}"
       sequence: !input button_3_single
-    - conditions: "{{ command == 'press' and button == 'button_4' }}"
+    - conditions: "{{ trigger.id == 'button_4_press' }}"
       sequence: !input button_4_single
-    - conditions: "{{ command == 'double' and button == 'button_1' }}"
+    - conditions: "{{ trigger.id == 'button_1_double' }}"
       sequence: !input button_1_double
-    - conditions: "{{ command == 'double' and button == 'button_2' }}"
+    - conditions: "{{ trigger.id == 'button_2_double' }}"
       sequence: !input button_2_double
-    - conditions: "{{ command == 'double' and button == 'button_3' }}"
+    - conditions: "{{ trigger.id == 'button_3_double' }}"
       sequence: !input button_3_double
-    - conditions: "{{ command == 'double' and button == 'button_4' }}"
+    - conditions: "{{ trigger.id == 'button_4_double' }}"
       sequence: !input button_4_double
-    - conditions: "{{ command == 'double' and button == 'button_centre' }}"
+    - conditions: "{{ trigger.id == 'button_centre_double' }}"
       sequence: !input button_centre_double
-    - conditions: "{{ is_rotation and direction in ['left', 'right'] }}"
+    - conditions: "{{ trigger.id == 'button_1_long' }}"
+      sequence: !input button_1_long
+    - conditions: "{{ trigger.id == 'button_2_long' }}"
+      sequence: !input button_2_long
+    - conditions: "{{ trigger.id == 'button_3_long' }}"
+      sequence: !input button_3_long
+    - conditions: "{{ trigger.id == 'button_4_long' }}"
+      sequence: !input button_4_long
+    - conditions: "{{ trigger.id == 'button_centre_long' }}"
+      sequence: !input button_centre_long
+    - conditions: "{{ trigger.id == 'button_1_long_release' }}"
+      sequence: !input button_1_long_release
+    - conditions: "{{ trigger.id == 'button_2_long_release' }}"
+      sequence: !input button_2_long_release
+    - conditions: "{{ trigger.id == 'button_3_long_release' }}"
+      sequence: !input button_3_long_release
+    - conditions: "{{ trigger.id == 'button_4_long_release' }}"
+      sequence: !input button_4_long_release
+    - conditions: "{{ trigger.id == 'button_centre_long_release' }}"
+      sequence: !input button_centre_long_release
+    - conditions: "{{ trigger.id in ['rotate_right', 'rotate_left'] }}"
       sequence:
       - variables:
+          volume_up: "{{ trigger.id == 'rotate_right' }}"
           current_volume: "{{ state_attr(volume_player, 'volume_level') }}"
-          volume_change: "{{ volume_increment if direction == 'right' else -volume_increment }}"
       - choose:
         - conditions: "{{ volume_only_when_playing and not is_state(transport_player, 'playing') }}"
           sequence:
           - if:
               - condition: template
-                value_template: "{{ logbook_enabled }}"
+                value_template: "{{ activity_logging_enabled }}"
             then:
               - action: logbook.log
                 data:
@@ -242,7 +498,7 @@ actions:
           sequence:
           - if:
               - condition: template
-                value_template: "{{ logbook_enabled }}"
+                value_template: "{{ activity_logging_enabled }}"
             then:
               - action: logbook.log
                 data:
@@ -250,20 +506,40 @@ actions:
                   message: >
                     Volume Player has no volume level - ignoring rotation event -
         default:
-          - action: media_player.volume_set
-            target:
-              entity_id: !input volume_player
-            data:
-              volume_level: >
-                {% set new_volume = current_volume + (volume_change / 100) %}
-                {{ ([0.0, new_volume, 1.0] | sort)[1] | round(2) }}
-          - if:
-              - condition: template
-                value_template: "{{ logbook_enabled }}"
-            then:
-              - action: logbook.log
+          - variables:
+              new_volume: >
+                {% if volume_up %}
+                  {{ [current_volume + (volume_increment / 100), max_volume / 100] | min | round(2) }}
+                {% else %}
+                  {{ [current_volume - (volume_increment / 100), 0.0] | max | round(2) }}
+                {% endif %}
+          - choose:
+            # At or above the maximum: never let a right turn raise the volume, and never
+            # let it pull an already-higher volume down to the maximum either
+            - conditions: "{{ volume_up and new_volume <= current_volume }}"
+              sequence:
+              - if:
+                  - condition: template
+                    value_template: "{{ activity_logging_enabled }}"
+                then:
+                  - action: logbook.log
+                    data:
+                      name: "{{ remote_friendly_name }} > "
+                      message: >
+                        At Maximum Volume ({{ max_volume }}) - ignoring rotation event -
+            default:
+              - action: media_player.volume_set
+                target:
+                  entity_id: !input volume_player
                 data:
-                  name: "{{ remote_friendly_name }} > "
-                  message: >
-                    {{ 'Increase' if direction == 'right' else 'Decrease' }} Volume
-                    (Volume Change: {{ volume_change | abs }}) -
+                  volume_level: "{{ new_volume }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ activity_logging_enabled }}"
+                then:
+                  - action: logbook.log
+                    data:
+                      name: "{{ remote_friendly_name }} > "
+                      message: >
+                        {{ 'Increase' if volume_up else 'Decrease' }} Volume
+                        (Volume Change: {{ volume_increment }}, New Volume: {{ (new_volume * 100) | round(0) | int }}) -
