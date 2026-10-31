@@ -1,0 +1,269 @@
+blueprint:
+  name: Candeo 5-Button Rotary Remote - Media Controls
+  domain: automation
+  homeassistant:
+    min_version: 2024.11.0
+  description: |
+    # Candeo 5-Button Remote with Rotary Dial - Media Controls (ZHA)
+
+    This blueprint enables a Candeo C-ZB-SR5BR 5-button remote with rotary dial to act as a
+    media controller while also allowing for the configuration of custom actions for the
+    remaining button presses.
+
+    To use this blueprint, select the Candeo remote which will generate events and the media
+    devices to be controlled. You can specify separate media players for volume control (dial)
+    and transport control (play/pause, track navigation), or select the same player for both.
+
+    ## Built-In Behaviors
+
+    * The Center button toggles the play/pause state of the media player
+    * Button 1 navigates to the previous track
+    * Button 2 navigates to the next track
+    * Buttons 3 and 4 have no default behavior
+    * Volume increases when the dial is rotated right (clockwise) and decreases when it is
+      rotated left (counter-clockwise)
+
+    ## Volume Control
+
+    The remote reports each "click" of the dial as a separate event; it does not report the
+    speed of rotation. Each click changes the volume by the "Volume Increment" set below.
+
+    ## Logbook Logging
+
+    When Logbook Logging is enabled, a logbook event will be generated each time an event is
+    received. In the case of a rotation event, a second event will be generated which describes
+    how the volume was adjusted.
+
+    The "Logbook" is accessed from the left navigation pane of Home Assistant.
+
+    ## Custom Actions
+
+    You can additionally create custom actions for single presses of Buttons 3 and 4, and for
+    double presses of all five buttons. These custom actions are optional. There are no default
+    behaviors.
+
+    Version History:
+    * 1.00 (Oct-30-2026) : Initial Release
+
+  input:
+    remote:
+      name: Candeo Remote
+      selector:
+        device:
+          filter:
+            - integration: zha
+              manufacturer: Candeo
+              model: C-ZB-SR5BR
+          multiple: false
+    volume_player:
+      name: Volume Player
+      description: The media player for volume control (dial rotation)
+      selector:
+        entity:
+          domain:
+          - media_player
+          multiple: false
+    transport_player:
+      name: Transport Player
+      description: The media player for play/pause and track controls (buttons)
+      selector:
+        entity:
+          domain:
+          - media_player
+          multiple: false
+    logbook_enabled:
+      name: Enable logging to Logbook
+      default: false
+      selector:
+        boolean: {}
+    volume_controls:
+      name: Volume Controls
+      icon: mdi:volume-high
+      collapsed: true
+      input:
+        volume_only_when_playing:
+          name: Adjust Volume Only When Playing
+          description: If enabled, rotating the dial will only adjust the volume if
+            the Transport Player is currently playing. If the Transport Player is
+            stopped or paused, the rotation event will be ignored
+          default: false
+          selector:
+            boolean: {}
+        volume_increment:
+          name: Volume Increment
+          description: The amount to increase or decrease the volume for each click
+            of the dial
+          default: 2
+          selector:
+            number:
+              min: 1.0
+              max: 10.0
+              step: 1.0
+              mode: slider
+    single_press_custom:
+      name: Single Press - Custom Actions
+      icon: mdi:gesture-tap
+      collapsed: true
+      input:
+        button_3_single:
+          name: Button 3 (Single Press)
+          description: Action to run on a single press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_4_single:
+          name: Button 4 (Single Press)
+          description: Action to run on a single press of Button 4
+          default: []
+          selector:
+            action: {}
+    double_press_custom:
+      name: Double Press - Custom Actions
+      icon: mdi:gesture-double-tap
+      collapsed: true
+      input:
+        button_1_double:
+          name: Button 1 (Double Press)
+          description: Action to run on a double press of Button 1
+          default: []
+          selector:
+            action: {}
+        button_2_double:
+          name: Button 2 (Double Press)
+          description: Action to run on a double press of Button 2
+          default: []
+          selector:
+            action: {}
+        button_3_double:
+          name: Button 3 (Double Press)
+          description: Action to run on a double press of Button 3
+          default: []
+          selector:
+            action: {}
+        button_4_double:
+          name: Button 4 (Double Press)
+          description: Action to run on a double press of Button 4
+          default: []
+          selector:
+            action: {}
+        button_centre_double:
+          name: Center Button (Double Press)
+          description: Action to run on a double press of the Center button
+          default: []
+          selector:
+            action: {}
+# Each click of the dial arrives as its own event, often in quick bursts. Queue them
+# rather than restarting so that no clicks are dropped.
+mode: queued
+max: 20
+max_exceeded: silent
+triggers:
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+actions:
+  - variables:
+      command: "{{ trigger.event.data.command }}"
+      event_args: "{{ trigger.event.data.args if trigger.event.data.args is mapping else {} }}"
+      button: "{{ event_args.get('button', '') }}"
+      direction: "{{ event_args.get('device_rotated', '') }}"
+      is_rotation: "{{ command in ['started_rotating', 'continued_rotating'] }}"
+      logbook_enabled: !input logbook_enabled
+      volume_increment: !input volume_increment
+      volume_player: !input volume_player
+      transport_player: !input transport_player
+      volume_player_friendly_name: >
+        {{ state_attr(volume_player, 'friendly_name') or volume_player }}
+      transport_player_friendly_name: >
+        {{ state_attr(transport_player, 'friendly_name') or transport_player }}
+      remote: !input remote
+      remote_friendly_name: >
+        {{ device_attr(remote, 'name_by_user') or device_attr(remote, 'name') or remote }}
+      volume_only_when_playing: !input volume_only_when_playing
+  - if:
+      - condition: template
+        value_template: "{{ logbook_enabled }}"
+    then:
+      - action: logbook.log
+        data:
+          name: "{{ remote_friendly_name }} > "
+          message: >
+            Volume Player: {{ volume_player_friendly_name }}, Transport Player: {{ transport_player_friendly_name }}, Command:
+            {{ command }}{% if button %}, Button: {{ button }}{% endif %}{% if direction %}, Direction: {{ direction }}{% endif %} -
+  - choose:
+    - conditions: "{{ command == 'press' and button == 'button_centre' }}"
+      sequence:
+      - action: media_player.media_play_pause
+        target:
+          entity_id: !input transport_player
+    - conditions: "{{ command == 'press' and button == 'button_1' }}"
+      sequence:
+      - action: media_player.media_previous_track
+        target:
+          entity_id: !input transport_player
+    - conditions: "{{ command == 'press' and button == 'button_2' }}"
+      sequence:
+      - action: media_player.media_next_track
+        target:
+          entity_id: !input transport_player
+    - conditions: "{{ command == 'press' and button == 'button_3' }}"
+      sequence: !input button_3_single
+    - conditions: "{{ command == 'press' and button == 'button_4' }}"
+      sequence: !input button_4_single
+    - conditions: "{{ command == 'double' and button == 'button_1' }}"
+      sequence: !input button_1_double
+    - conditions: "{{ command == 'double' and button == 'button_2' }}"
+      sequence: !input button_2_double
+    - conditions: "{{ command == 'double' and button == 'button_3' }}"
+      sequence: !input button_3_double
+    - conditions: "{{ command == 'double' and button == 'button_4' }}"
+      sequence: !input button_4_double
+    - conditions: "{{ command == 'double' and button == 'button_centre' }}"
+      sequence: !input button_centre_double
+    - conditions: "{{ is_rotation and direction in ['left', 'right'] }}"
+      sequence:
+      - variables:
+          current_volume: "{{ state_attr(volume_player, 'volume_level') }}"
+          volume_change: "{{ volume_increment if direction == 'right' else -volume_increment }}"
+      - choose:
+        - conditions: "{{ volume_only_when_playing and not is_state(transport_player, 'playing') }}"
+          sequence:
+          - if:
+              - condition: template
+                value_template: "{{ logbook_enabled }}"
+            then:
+              - action: logbook.log
+                data:
+                  name: "{{ remote_friendly_name }} > "
+                  message: >
+                    Player not playing - ignoring rotation event -
+        - conditions: "{{ current_volume is none }}"
+          sequence:
+          - if:
+              - condition: template
+                value_template: "{{ logbook_enabled }}"
+            then:
+              - action: logbook.log
+                data:
+                  name: "{{ remote_friendly_name }} > "
+                  message: >
+                    Volume Player has no volume level - ignoring rotation event -
+        default:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input volume_player
+            data:
+              volume_level: >
+                {% set new_volume = current_volume + (volume_change / 100) %}
+                {{ ([0.0, new_volume, 1.0] | sort)[1] | round(2) }}
+          - if:
+              - condition: template
+                value_template: "{{ logbook_enabled }}"
+            then:
+              - action: logbook.log
+                data:
+                  name: "{{ remote_friendly_name }} > "
+                  message: >
+                    {{ 'Increase' if direction == 'right' else 'Decrease' }} Volume
+                    (Volume Change: {{ volume_change | abs }}) -
