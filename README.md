@@ -30,7 +30,7 @@ To install, use the "Import Blueprint" button on the Blueprints Exchange post or
 
 ### [Candeo 5-Button Rotary Remote - Media Controls](blueprints/zha-candeo-sr5br-media-controls.yaml)
 
-For the Candeo 5-Button Remote with Rotary Dial (C-ZB-SR5BR). Purpose-built for controlling media players. The center button toggles play/pause, buttons 1/2 handle previous/next track, and the dial adjusts volume by a configurable increment per click, with an optional maximum volume. Includes options for custom actions on single presses of buttons 3/4 and double presses, long presses, and long-press releases of all five buttons. Requires Home Assistant 2024.11 or later.
+For the Candeo 5-Button Remote with Rotary Dial (C-ZB-SR5BR). Purpose-built for controlling media players. The center button toggles play/pause, buttons 1/2 handle previous/next track, and the dial adjusts volume by a configurable increment per click, with an optional maximum volume. Includes options for custom actions on single presses of buttons 3/4 and double presses, long presses, and long-press releases of all five buttons. Requires Home Assistant 2026.4 or later.
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fgtunes-dev%2Fha-toolkit%2Fblob%2Fmain%2Fblueprints%2Fzha-candeo-sr5br-media-controls.yaml)
 
