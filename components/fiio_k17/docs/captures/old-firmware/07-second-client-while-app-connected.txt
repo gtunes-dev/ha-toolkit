@@ -1,0 +1,4 @@
+[  0.002s] connected
+[  1.008s] >>> sent 05010008
+[ 10.050s] 10s elapsed
+[ 10.050s] closed

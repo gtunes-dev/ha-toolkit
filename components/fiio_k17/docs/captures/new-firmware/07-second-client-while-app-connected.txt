@@ -1,0 +1,4 @@
+[  0.002s] connected
+[  1.007s] >>> sent 05010008
+[  6.475s] recv error: ConnectionResetError [Errno 54] Connection reset by peer
+[  6.475s] closed

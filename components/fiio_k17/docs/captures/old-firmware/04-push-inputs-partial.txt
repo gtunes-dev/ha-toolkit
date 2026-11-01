@@ -1,0 +1,12 @@
+connected; listening 30s — GO
+[  5.998s] recv   12: 'a607000C0003'
+    frame 'a607000C0003'
+[  8.003s] recv   12: 'a607000C0004'
+    frame 'a607000C0004'
+[  9.686s] recv   12: 'a607000C0005'
+    frame 'a607000C0005'
+[ 11.364s] recv   12: 'a607000C0006'
+    frame 'a607000C0006'
+[ 16.618s] recv   12: 'a607000C0001'
+    frame 'a607000C0001'
+done

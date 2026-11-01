@@ -1,0 +1,13 @@
+initial connect (may be refused if a previous socket just closed)
+  accepted after 0.00s (1 attempts)
+cycle 1: reply 156 chars: 'a501009C{"currentVolume":13,"folderJump"'
+  reconnect accepted after 0.00s (1 attempts)
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-greg-projects-ha-toolkit/76ed3e9c-cf51-4842-a647-c7d97733cfe2/scratchpad/k17_reconnect.py", line 74, in <module>
+    main()
+    ~~~~^^
+  File "/private/tmp/claude-501/-Users-greg-projects-ha-toolkit/76ed3e9c-cf51-4842-a647-c7d97733cfe2/scratchpad/k17_reconnect.py", line 64, in main
+    reply = query(s)
+  File "/private/tmp/claude-501/-Users-greg-projects-ha-toolkit/76ed3e9c-cf51-4842-a647-c7d97733cfe2/scratchpad/k17_reconnect.py", line 40, in query
+    chunk = s.recv(4096)
+ConnectionResetError: [Errno 54] Connection reset by peer

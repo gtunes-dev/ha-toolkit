@@ -7,10 +7,10 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
 
 from .client import FiiOK17Client
 from .const import DOMAIN
+from .coordinator import FiiOK17Coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,16 +19,14 @@ PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FiiO K17 from a config entry."""
-    host = entry.data[CONF_HOST]
+    client = FiiOK17Client(entry.data[CONF_HOST])
+    coordinator = FiiOK17Coordinator(hass, entry, client)
 
-    client = FiiOK17Client(host)
-    try:
-        await client.connect()
-    except (ConnectionError, OSError) as err:
-        raise ConfigEntryNotReady(f"Unable to connect to {host}") from err
+    # Raises ConfigEntryNotReady if the device can't be read yet
+    await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = client
+    hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -38,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        client: FiiOK17Client = hass.data[DOMAIN].pop(entry.entry_id)
-        await client.disconnect()
+        coordinator: FiiOK17Coordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        await coordinator.client.close()
 
     return unload_ok

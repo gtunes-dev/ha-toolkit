@@ -1,0 +1,31 @@
+== 0: fresh socket, no handshake
+
+== 0 GET_SETTINGS (no INIT): send '05010008'
+  [  0.025s] recv  156 bytes: 'a501009C{"currentVolume":13,"folderJump":true,"gaplessPlay":true,"maxVolume":100,"memoryPlay":false,"memoryType":0,"playMode":0,"replayGain":0,"usbAudio":2}'
+  [  0.025s] recv   12 bytes: 'a60a000C000C'
+    frame a501 len= 156 OK  'a501009C{"currentVolume":13,"folderJump":true,"gaplessPlay":'...
+    json (9 keys): {"currentVolume": 13, "folderJump": true, "gaplessPlay": true, "maxVolume": 100, "memoryPlay": false, "memoryType": 0, "playMode": 0, "replayGain": 0, "usbAudio": 2}
+    frame a60a len=  12 OK  'a60a000C000C'
+
+[  5.543s] connected; unsolicited data on connect:
+
+== 1 INIT: send '0599000c0000'
+  [  6.562s] recv   12 bytes: 'a599000C0302'
+    frame a599 len=  12 OK  'a599000C0302'
+
+== 2 GET_SETTINGS: send '05010008'
+  [  8.081s] recv  156 bytes: 'a501009C{"currentVolume":13,"folderJump":true,"gaplessPlay":true,"maxVolume":100,"memoryPlay":false,"memoryType":0,"playMode":0,"replayGain":0,"usbAudio":2}'
+  [  8.081s] recv   12 bytes: 'a60a000C000C'
+    frame a501 len= 156 OK  'a501009C{"currentVolume":13,"folderJump":true,"gaplessPlay":'...
+    json (9 keys): {"currentVolume": 13, "folderJump": true, "gaplessPlay": true, "maxVolume": 100, "memoryPlay": false, "memoryType": 0, "playMode": 0, "replayGain": 0, "usbAudio": 2}
+    frame a60a len=  12 OK  'a60a000C000C'
+
+== 3 GET_INPUT: send '0607000c0000'
+  [  9.599s] recv   12 bytes: 'a607000C0001'
+    frame a607 len=  12 OK  'a607000C0001'
+
+== 4 SET_VOLUME (re-set current=13): send '0502000c000d'
+  [ 11.119s] recv   12 bytes: 'a502000C000D'
+    frame a502 len=  12 OK  'a502000C000D'
+
+== 5 listening 20s: turn the knob, switch inputs on the device

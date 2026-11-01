@@ -11,7 +11,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_NAME
 from homeassistant.helpers import selector
 
-from .client import FiiOK17Client
+from .client import DeviceBusyError, DeviceUnreachableError, FiiOK17Client
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,9 +50,10 @@ class FiiOK17ConfigFlow(ConfigFlow, domain=DOMAIN):
             # Test connection
             client = FiiOK17Client(host)
             try:
-                await client.connect()
-                await client.disconnect()
-            except ConnectionError:
+                await client.refresh()
+            except DeviceBusyError:
+                errors["base"] = "device_busy"
+            except DeviceUnreachableError:
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected exception")

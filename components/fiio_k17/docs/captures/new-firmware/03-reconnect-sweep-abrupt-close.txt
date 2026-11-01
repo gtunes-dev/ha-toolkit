@@ -1,0 +1,10 @@
+delay   0.0s  [rst sent]  -> reset
+    (recovered after 1.3s, 3 tries)
+delay   0.2s  [rst sent]  -> refused
+    (recovered after 0.8s, 2 tries)
+delay   0.5s  [rst sent]  -> refused
+    (recovered after 0.8s, 2 tries)
+delay   1.0s  [rst sent]  -> refused
+delay   2.0s  [rst sent]  -> ok (400 chars)
+    (recovered after 1.3s, 3 tries)
+delay   3.0s  [rst sent]  -> ok (400 chars)

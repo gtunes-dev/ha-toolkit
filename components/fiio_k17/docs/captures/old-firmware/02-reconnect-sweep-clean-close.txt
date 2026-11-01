@@ -1,0 +1,12 @@
+delay   0.0s  [device EOF after 0.01s]  -> refused
+delay   0.5s  [device EOF after 0.01s]  -> refused
+delay   1.0s  [device EOF after 0.01s]  -> refused
+delay   2.0s  [device EOF after 0.01s]  -> ok (168 chars)
+    (recovered after 2.8s, 2 tries)
+delay   3.0s  [device EOF after 0.01s]  -> ok (168 chars)
+    (recovered after 1.8s, 2 tries)
+delay   5.0s  [device EOF after 0.01s]  -> ok (168 chars)
+    (recovered after 2.8s, 2 tries)
+delay   8.0s  [device EOF after 0.01s]  -> ok (168 chars)
+    (recovered after 2.8s, 2 tries)
+delay  12.0s  [device EOF after 0.01s]  -> ok (168 chars)

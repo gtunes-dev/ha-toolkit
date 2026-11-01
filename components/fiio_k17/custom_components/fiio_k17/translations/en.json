@@ -18,7 +18,8 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect. Ensure the device is on and the FiiO Control app is closed.",
+      "cannot_connect": "Failed to connect. Check the IP address and that the device is on.",
+      "device_busy": "The device is in use by another app. Close the FiiO Control app and try again.",
       "unknown": "Unexpected error occurred."
     },
     "abort": {

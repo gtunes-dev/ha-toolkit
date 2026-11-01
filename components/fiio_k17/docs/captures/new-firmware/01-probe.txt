@@ -1,0 +1,31 @@
+== 0: fresh socket, no handshake
+
+== 0 GET_SETTINGS (no INIT): send '05010008'
+  [  0.035s] recv  388 bytes: 'a5010184{"currentVolume":19,"folderJump":false,"gaplessPlay":false,"maxVolume":100,"memoryPlay":false,"memoryType":0,"playMode":0,"muteMode":0,"replayGain":0,"usbAudio":2,"artist_sub_album":1,"http_replace_link":0,"soc_version":265,"ota_site":"k17pack.fiio.net","width":240,"height":240,"quality":100,"rgb":888,"cus_count":0,"sys_count":0,"video":"[\\"mp4\\"]","image":"[\\"png\\", \\"gif\\"]"}'
+  [  0.035s] recv   12 bytes: 'a60a000C000C'
+    frame a501 len= 388 OK  'a5010184{"currentVolume":19,"folderJump":false,"gaplessPlay"'...
+    json (22 keys): {"artist_sub_album": 1, "currentVolume": 19, "cus_count": 0, "folderJump": false, "gaplessPlay": false, "height": 240, "http_replace_link": 0, "image": "[\"png\", \"gif\"]", "maxVolume": 100, "memoryPlay": false, "memoryType": 0, "muteMode": 0, "ota_site": "k17pack.fiio.net", "playMode": 0, "quality": 100, "replayGain": 0, "rgb": 888, "soc_version": 265, "sys_count": 0, "usbAudio": 2, "video": "[\"mp4\"]", "width": 240}
+    frame a60a len=  12 OK  'a60a000C000C'
+
+[  5.555s] connected; unsolicited data on connect:
+
+== 1 INIT: send '0599000c0000'
+  [  6.566s] recv   12 bytes: 'a599000C0302'
+    frame a599 len=  12 OK  'a599000C0302'
+
+== 2 GET_SETTINGS: send '05010008'
+  [  8.089s] recv  388 bytes: 'a5010184{"currentVolume":19,"folderJump":false,"gaplessPlay":false,"maxVolume":100,"memoryPlay":false,"memoryType":0,"playMode":0,"muteMode":0,"replayGain":0,"usbAudio":2,"artist_sub_album":1,"http_replace_link":0,"soc_version":265,"ota_site":"k17pack.fiio.net","width":240,"height":240,"quality":100,"rgb":888,"cus_count":0,"sys_count":0,"video":"[\\"mp4\\"]","image":"[\\"png\\", \\"gif\\"]"}'
+  [  8.089s] recv   12 bytes: 'a60a000C000C'
+    frame a501 len= 388 OK  'a5010184{"currentVolume":19,"folderJump":false,"gaplessPlay"'...
+    json (22 keys): {"artist_sub_album": 1, "currentVolume": 19, "cus_count": 0, "folderJump": false, "gaplessPlay": false, "height": 240, "http_replace_link": 0, "image": "[\"png\", \"gif\"]", "maxVolume": 100, "memoryPlay": false, "memoryType": 0, "muteMode": 0, "ota_site": "k17pack.fiio.net", "playMode": 0, "quality": 100, "replayGain": 0, "rgb": 888, "soc_version": 265, "sys_count": 0, "usbAudio": 2, "video": "[\"mp4\"]", "width": 240}
+    frame a60a len=  12 OK  'a60a000C000C'
+
+== 3 GET_INPUT: send '0607000c0000'
+  [  9.609s] recv   12 bytes: 'a607000C0001'
+    frame a607 len=  12 OK  'a607000C0001'
+
+== 4 SET_VOLUME (re-set current=19): send '0502000c0013'
+  [ 11.128s] recv   12 bytes: 'a502000C0013'
+    frame a502 len=  12 OK  'a502000C0013'
+
+== 5 listening 3s: turn the knob, switch inputs on the device

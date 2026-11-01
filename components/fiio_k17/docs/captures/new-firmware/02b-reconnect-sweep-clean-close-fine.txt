@@ -1,0 +1,10 @@
+delay   0.0s  [device EOF after 0.01s]  -> refused
+delay   0.0s  [device EOF after 0.01s]  -> refused
+delay   0.1s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.1s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.2s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.2s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.3s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.3s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.4s  [device EOF after 0.01s]  -> ok (400 chars)
+delay   0.4s  [device EOF after 0.01s]  -> refused
